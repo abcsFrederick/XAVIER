@@ -270,31 +270,66 @@ VCF2MAF_WRAPPER=config['scripts']['vcf2maf_wrapper']
 SOBDetector_out=os.path.join(BASEDIR,"ffpe_filter","sobdetector")
 SOBDetector_JARFILE=os.path.join(SOBDetector_out, "jarfile","SOBDetector_v1.0.2.jar")
 
-name_symlinks=[]
+name_symlinks = []
+
+# FASTQ mode
 if fqs_found:
-    name_suffix=".R[1,2].fastq.gz"
-    if not os.path.exists(input_fqdir):
-        # print("making"+output_fqdir)
-        os.makedirs(input_fqdir)
-        name_symlinks=_sym_safe_(fqs_found, input_fqdir)
-    else:
-        name_symlinks=glob.glob(os.path.join(input_fqdir,'*.fastq.gz'))
+    name_suffix = r"\.R[12]\.fastq\.gz$"
+
+    # Ensure input_fqdir exists
+    os.makedirs(input_fqdir, exist_ok=True)
+
+    # Prefer existing symlinks if present
+    name_symlinks = glob.glob(os.path.join(input_fqdir, "*.fastq.gz"))
+
+    # Harden: if directory exists but is empty, (re)populate it
+    if not name_symlinks:
+        name_symlinks = _sym_safe_(fqs_found, input_fqdir)
+
+# BAM mode
 elif bams_found:
-    name_suffix=".input.bam"
-    if not os.path.exists(input_bamdir):
-        os.makedirs(input_bamdir)
-    if (len(os.listdir(input_bamdir))==0):
-        bam_symlinks=_sym_safe_(bams_found, input_bamdir)
-    name_symlinks=glob.glob(os.path.join(input_bamdir,'*.input.bam'))
+    name_suffix = r"\.input\.bam$"
+
+    os.makedirs(input_bamdir, exist_ok=True)
+    name_symlinks = glob.glob(os.path.join(input_bamdir, "*.input.bam"))
+
+    if not name_symlinks:
+        _ = _sym_safe_(bams_found, input_bamdir)
+        name_symlinks = glob.glob(os.path.join(input_bamdir, "*.input.bam"))
+
+# Nothing found
 else:
-    raise NameError("""\n\tFatal: No relevant files found in the BAM or FASTQ directory!
+    raise NameError(
+        """\n\tFatal: No relevant files found in the BAM or FASTQ directory!
         FASTQ source path provided: {}
         BAM source path provided: {}
         Folders should contain files ending with '.fastq.gz' or '.bam' respectively.
         """.format(fq_source, bam_source, sys.argv[0])
     )
 
-samples = set([re.sub(name_suffix,"",os.path.basename(fname)) for fname in name_symlinks]) ## Only returns paired fqs
+# Derive sample names
+samples = set([
+    re.sub(name_suffix, "", os.path.basename(fname))
+    for fname in name_symlinks
+])
+
+# Extra hardening: fail early with a more actionable message
+if not samples:
+    raise NameError(
+        """\n\tFatal: No samples could be inferred from discovered inputs.
+        FASTQ_SOURCE: {}
+        BAM_SOURCE: {}
+        input_fqdir: {}
+        input_bamdir: {}
+        Found FASTQs: {}
+        Found BAMs: {}
+        Note: if input_files/fastq or input_files/bam exists but is empty,
+        populate it or delete it and rerun.
+        """.format(
+            fq_source, bam_source, input_fqdir, input_bamdir,
+            len(fqs_found), len(bams_found), sys.argv[0]
+        )
+    )
 
 pairs_file = config['input_params']['PAIRS_FILE']
 
