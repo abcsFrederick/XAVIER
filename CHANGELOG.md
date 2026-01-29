@@ -1,7 +1,10 @@
 ## XAVIER development version
 
+## XAVIER 3.2.2
+
 - Fixed a bug where tumor-only and unpaired runs could fail during Snakefile parsing (#174, @samarth8392)
 - Fixed the sample names in `pairs.tsv` in test/data folder which causes run with test data to fail (#174, @samarth8392)
+
 ## XAVIER 3.2.1
 
 - Added separate variable for control-freec genome fasta file (#169, @samarth8392)
